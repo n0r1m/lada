@@ -1,132 +1,156 @@
 // Game state
 let gameState = {
-    isPlaying: false,
+    isRunning: false,
     score: 0,
-    coins: 0,
-    highScore: 0,
     isJumping: false,
     jumpVelocity: 0,
     gravity: 0.8,
     jumpForce: -15,
     groundY: 0,
-    carX: 100,
-    carY: 0,
     obstacles: [],
-    coins: [],
-    gameSpeed: 5,
-    theme: 'light'
+    lastObstacleTime: 0,
+    obstacleInterval: 2000,
+    gameSpeed: 5
 };
 
-// Canvas setup
-const canvas = document.getElementById('game-canvas');
-const ctx = canvas.getContext('2d');
+// Game objects
+const dino = {
+    x: 50,
+    y: 0,
+    width: 40,
+    height: 60,
+    color: '#333'
+};
 
-// Load images
-const carImage = new Image();
-carImage.src = './assets/lada.png';
+const obstacle = {
+    width: 20,
+    height: 40,
+    color: '#666'
+};
 
-const coneImage = new Image();
-coneImage.src = './assets/cone.png';
-
-const coinImage = new Image();
-coinImage.src = './assets/coin.png';
-
-// Resize canvas
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+// Initialize game
+function initGame() {
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Set canvas size
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    
+    // Set ground position
     gameState.groundY = canvas.height - 100;
-    gameState.carY = gameState.groundY;
-}
-
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-
-// Game functions
-function startGame() {
-    gameState.isPlaying = true;
+    dino.y = gameState.groundY - dino.height;
+    
+    // Reset game state
     gameState.score = 0;
-    gameState.coins = 0;
     gameState.obstacles = [];
-    gameState.coins = [];
-    gameState.gameSpeed = 5;
-    document.getElementById('menu').style.display = 'none';
+    gameState.lastObstacleTime = Date.now();
+    gameState.isRunning = true;
+    
+    // Start game loop
     gameLoop();
 }
 
+// Game loop
 function gameLoop() {
-    if (!gameState.isPlaying) return;
-
+    if (!gameState.isRunning) return;
+    
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw ground
-    ctx.fillStyle = '#333';
-    ctx.fillRect(0, gameState.groundY, canvas.width, canvas.height - gameState.groundY);
-
-    // Update car position
-    if (gameState.isJumping) {
-        gameState.carY += gameState.jumpVelocity;
-        gameState.jumpVelocity += gameState.gravity;
-
-        if (gameState.carY >= gameState.groundY) {
-            gameState.carY = gameState.groundY;
-            gameState.isJumping = false;
-        }
-    }
-
-    // Draw car
-    ctx.drawImage(carImage, gameState.carX, gameState.carY - 50, 80, 50);
-
-    // Generate obstacles
-    if (Math.random() < 0.02) {
-        gameState.obstacles.push({
-            x: canvas.width,
-            y: gameState.groundY - 40,
-            width: 40,
-            height: 40
-        });
-    }
-
-    // Generate coins
-    if (Math.random() < 0.01) {
-        gameState.coins.push({
-            x: canvas.width,
-            y: gameState.groundY - 100,
-            width: 30,
-            height: 30
-        });
-    }
-
-    // Update and draw obstacles
-    gameState.obstacles = gameState.obstacles.filter(obstacle => {
-        obstacle.x -= gameState.gameSpeed;
-        ctx.drawImage(coneImage, obstacle.x, obstacle.y, obstacle.width, obstacle.height);
-        return obstacle.x > -obstacle.width;
-    });
-
-    // Update and draw coins
-    gameState.coins = gameState.coins.filter(coin => {
-        coin.x -= gameState.gameSpeed;
-        ctx.drawImage(coinImage, coin.x, coin.y, coin.width, coin.height);
-        return coin.x > -coin.width;
-    });
-
-    // Check collisions
-    checkCollisions();
-
-    // Update score
-    gameState.score++;
-    document.getElementById('score').textContent = `Score: ${Math.floor(gameState.score / 10)}`;
-
-    // Increase game speed
-    if (gameState.score % 500 === 0) {
-        gameState.gameSpeed += 0.5;
-    }
-
+    
+    // Update game state
+    updateGame();
+    
+    // Draw game objects
+    drawGame(ctx);
+    
+    // Request next frame
     requestAnimationFrame(gameLoop);
 }
 
+// Update game state
+function updateGame() {
+    // Update dino position
+    if (gameState.isJumping) {
+        dino.y += gameState.jumpVelocity;
+        gameState.jumpVelocity += gameState.gravity;
+        
+        // Check if landed
+        if (dino.y >= gameState.groundY - dino.height) {
+            dino.y = gameState.groundY - dino.height;
+            gameState.isJumping = false;
+            gameState.jumpVelocity = 0;
+        }
+    }
+    
+    // Generate obstacles
+    const currentTime = Date.now();
+    if (currentTime - gameState.lastObstacleTime > gameState.obstacleInterval) {
+        gameState.obstacles.push({
+            x: canvas.width,
+            y: gameState.groundY - obstacle.height,
+            width: obstacle.width,
+            height: obstacle.height
+        });
+        gameState.lastObstacleTime = currentTime;
+    }
+    
+    // Update obstacles
+    for (let i = gameState.obstacles.length - 1; i >= 0; i--) {
+        const obs = gameState.obstacles[i];
+        obs.x -= gameState.gameSpeed;
+        
+        // Remove off-screen obstacles
+        if (obs.x + obs.width < 0) {
+            gameState.obstacles.splice(i, 1);
+            gameState.score++;
+            updatePersonalBest();
+        }
+        
+        // Check collision
+        if (checkCollision(dino, obs)) {
+            gameOver();
+        }
+    }
+    
+    // Increase game speed
+    gameState.gameSpeed += 0.001;
+}
+
+// Draw game objects
+function drawGame(ctx) {
+    // Draw ground
+    ctx.fillStyle = '#999';
+    ctx.fillRect(0, gameState.groundY, canvas.width, canvas.height - gameState.groundY);
+    
+    // Draw dino
+    ctx.fillStyle = dino.color;
+    ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
+    
+    // Draw obstacles
+    ctx.fillStyle = obstacle.color;
+    gameState.obstacles.forEach(obs => {
+        ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+    });
+    
+    // Draw score
+    ctx.fillStyle = '#000';
+    ctx.font = '20px Arial';
+    ctx.fillText(`Score: ${gameState.score}`, 10, 30);
+}
+
+// Check collision between two rectangles
+function checkCollision(rect1, rect2) {
+    return rect1.x < rect2.x + rect2.width &&
+           rect1.x + rect1.width > rect2.x &&
+           rect1.y < rect2.y + rect2.height &&
+           rect1.y + rect1.height > rect2.y;
+}
+
+// Handle jump
 function jump() {
     if (!gameState.isJumping) {
         gameState.isJumping = true;
@@ -134,71 +158,45 @@ function jump() {
     }
 }
 
-function checkCollisions() {
-    // Check obstacle collisions
-    for (let obstacle of gameState.obstacles) {
-        if (gameState.carX < obstacle.x + obstacle.width &&
-            gameState.carX + 80 > obstacle.x &&
-            gameState.carY < obstacle.y + obstacle.height &&
-            gameState.carY + 50 > obstacle.y) {
-            gameOver();
-        }
-    }
-
-    // Check coin collisions
-    for (let coin of gameState.coins) {
-        if (gameState.carX < coin.x + coin.width &&
-            gameState.carX + 80 > coin.x &&
-            gameState.carY < coin.y + coin.height &&
-            gameState.carY + 50 > coin.y) {
-            gameState.coins++;
-            document.getElementById('coins').textContent = `Coins: ${gameState.coins}`;
-        }
-    }
-}
-
+// Game over
 function gameOver() {
-    gameState.isPlaying = false;
-    if (gameState.score > gameState.highScore) {
-        gameState.highScore = gameState.score;
-    }
-    document.getElementById('menu').style.display = 'block';
-    document.getElementById('menu').innerHTML = `
-        <h1>Game Over!</h1>
-        <p>Score: ${Math.floor(gameState.score / 10)}</p>
-        <p>High Score: ${Math.floor(gameState.highScore / 10)}</p>
-        <button class="button" onclick="startGame()">Play Again</button>
-        <button class="button" onclick="showReferral()">Referral</button>
-    `;
+    gameState.isRunning = false;
+    updatePersonalBest();
+    showToast('Game Over! Score: ' + gameState.score);
 }
 
-function toggleTheme() {
-    gameState.theme = gameState.theme === 'light' ? 'dark' : 'light';
-    document.body.setAttribute('data-theme', gameState.theme);
-}
-
-function showReferral() {
-    const tg = window.Telegram.WebApp;
-    if (tg) {
-        const referralLink = `https://t.me/share/url?url=https://t.me/${tg.initDataUnsafe.user.username}`;
-        window.open(referralLink, '_blank');
+// Update personal best score
+function updatePersonalBest() {
+    const currentBest = parseInt(localStorage.getItem('personalBest') || '0');
+    if (gameState.score > currentBest) {
+        localStorage.setItem('personalBest', gameState.score);
+        document.getElementById('personal-best').textContent = gameState.score;
     }
 }
 
 // Event listeners
-document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space') {
+document.addEventListener('keydown', (event) => {
+    if (event.code === 'Space') {
+        event.preventDefault();
+        if (!gameState.isRunning) {
+            initGame();
+        } else {
+            jump();
+        }
+    }
+});
+
+// Touch events for mobile
+document.addEventListener('touchstart', (event) => {
+    event.preventDefault();
+    if (!gameState.isRunning) {
+        initGame();
+    } else {
         jump();
     }
 });
 
-document.addEventListener('touchstart', () => {
-    jump();
-});
-
-// Initialize Telegram Web App
-let tg = window.Telegram.WebApp;
-if (tg) {
-    tg.expand();
-    tg.ready();
+// Initialize game when start button is clicked
+function startGame() {
+    initGame();
 } 
