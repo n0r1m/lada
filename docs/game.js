@@ -19,7 +19,9 @@ let gameState = {
     obstacleInterval: 3000,
     collectedCoins: new Set(),
     lastCoinTime: 0,
-    coinInterval: 1500
+    coinInterval: 1500,
+    imagesLoaded: 0,
+    totalImages: 3
 };
 
 // Canvas setup
@@ -36,6 +38,35 @@ coneImage.src = './assets/cone.png';
 const coinImage = new Image();
 coinImage.src = './assets/coin.png';
 
+// Image loading handler
+function handleImageLoad() {
+    gameState.imagesLoaded++;
+    if (gameState.imagesLoaded === gameState.totalImages) {
+        // All images loaded, enable start button
+        document.getElementById('menu').style.display = 'block';
+    }
+}
+
+carImage.onload = handleImageLoad;
+coneImage.onload = handleImageLoad;
+coinImage.onload = handleImageLoad;
+
+// Fallback images if loading fails
+carImage.onerror = () => {
+    console.error('Failed to load car image');
+    carImage.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI1MCIgdmlld0JveD0iMCAwIDgwIDUwIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iNTAiIGZpbGw9IiM2NjY2NjYiLz48cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIzMCIgZmlsbD0iIzQ0NDQ0NCIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iNDUiIHI9IjUiIGZpbGw9IiMyMjIyMjIiLz48Y2lyY2xlIGN4PSI2MCIgY3k9IjQ1IiByPSI1IiBmaWxsPSIjMjIyMjIyIi8+PC9zdmc+';
+};
+
+coneImage.onerror = () => {
+    console.error('Failed to load cone image');
+    coneImage.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cGF0aCBkPSJNMjAgMEwwIDQwaDQweiIgZmlsbD0iI2ZmNjYwMCIvPjxwYXRoIGQ9Ik0yMCA1TDUgMzVoMzB6IiBmaWxsPSIjZmY4ODAwIi8+PC9zdmc+';
+};
+
+coinImage.onerror = () => {
+    console.error('Failed to load coin image');
+    coinImage.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgdmlld0JveD0iMCAwIDMwIDMwIj48Y2lyY2xlIGN4PSIxNSIgY3k9IjE1IiByPSIxNSIgZmlsbD0iI2ZmZGMwMCIvPjxjaXJjbGUgY3g9IjE1IiBjeT0iMTUiIHI9IjEyIiBmaWxsPSIjZmZmZjAwIi8+PC9zdmc+';
+};
+
 // Resize canvas
 function resizeCanvas() {
     canvas.width = window.innerWidth;
@@ -49,6 +80,11 @@ resizeCanvas();
 
 // Game functions
 function startGame() {
+    if (gameState.imagesLoaded < gameState.totalImages) {
+        alert('Please wait for all images to load');
+        return;
+    }
+    
     gameState.isPlaying = true;
     gameState.score = 0;
     gameState.coinCount = 0;
@@ -151,10 +187,10 @@ function checkCollisions() {
     for (let obstacle of gameState.obstacles) {
         // Create a smaller hitbox for the car
         const carHitbox = {
-            x: gameState.carX + 20, // Offset from left
-            y: gameState.carY - 30, // Offset from bottom
-            width: 40, // Smaller width
-            height: 30 // Smaller height
+            x: gameState.carX + 20,
+            y: gameState.carY - 30,
+            width: 40,
+            height: 30
         };
 
         // Create a smaller hitbox for the obstacle
@@ -201,6 +237,8 @@ function checkCollisions() {
             gameState.coinCount++;
             gameState.collectedCoins.add(coin);
             document.getElementById('coins').textContent = `Coins: ${gameState.coinCount}`;
+            // Remove the collected coin from the coins array
+            gameState.coins = gameState.coins.filter(c => c !== coin);
         }
     }
 }
