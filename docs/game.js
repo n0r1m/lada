@@ -2,7 +2,7 @@
 let gameState = {
     isPlaying: false,
     score: 0,
-    coins: 0,
+    coinCount: 0,
     highScore: 0,
     isJumping: false,
     jumpVelocity: 0,
@@ -14,7 +14,9 @@ let gameState = {
     obstacles: [],
     coins: [],
     gameSpeed: 5,
-    theme: 'light'
+    theme: 'light',
+    lastObstacleTime: 0,
+    obstacleInterval: 2000
 };
 
 // Canvas setup
@@ -46,11 +48,13 @@ resizeCanvas();
 function startGame() {
     gameState.isPlaying = true;
     gameState.score = 0;
-    gameState.coins = 0;
+    gameState.coinCount = 0;
     gameState.obstacles = [];
     gameState.coins = [];
     gameState.gameSpeed = 5;
+    gameState.lastObstacleTime = 0;
     document.getElementById('menu').style.display = 'none';
+    document.getElementById('coins').textContent = `Coins: ${gameState.coinCount}`;
     gameLoop();
 }
 
@@ -78,18 +82,20 @@ function gameLoop() {
     // Draw car
     ctx.drawImage(carImage, gameState.carX, gameState.carY - 50, 80, 50);
 
-    // Generate obstacles
-    if (Math.random() < 0.02) {
+    // Generate obstacles with timing
+    const currentTime = Date.now();
+    if (currentTime - gameState.lastObstacleTime > gameState.obstacleInterval) {
         gameState.obstacles.push({
             x: canvas.width,
             y: gameState.groundY - 40,
             width: 40,
             height: 40
         });
+        gameState.lastObstacleTime = currentTime;
     }
 
-    // Generate coins
-    if (Math.random() < 0.01) {
+    // Generate coins with reduced frequency
+    if (Math.random() < 0.005) {
         gameState.coins.push({
             x: canvas.width,
             y: gameState.groundY - 100,
@@ -119,9 +125,9 @@ function gameLoop() {
     gameState.score++;
     document.getElementById('score').textContent = `Score: ${Math.floor(gameState.score / 10)}`;
 
-    // Increase game speed
-    if (gameState.score % 500 === 0) {
-        gameState.gameSpeed += 0.5;
+    // Increase game speed more gradually
+    if (gameState.score % 1000 === 0) {
+        gameState.gameSpeed += 0.3;
     }
 
     requestAnimationFrame(gameLoop);
@@ -151,8 +157,8 @@ function checkCollisions() {
             gameState.carX + 80 > coin.x &&
             gameState.carY < coin.y + coin.height &&
             gameState.carY + 50 > coin.y) {
-            gameState.coins++;
-            document.getElementById('coins').textContent = `Coins: ${gameState.coins}`;
+            gameState.coinCount++;
+            document.getElementById('coins').textContent = `Coins: ${gameState.coinCount}`;
         }
     }
 }
@@ -192,13 +198,32 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-document.addEventListener('touchstart', () => {
+// Improved touch controls
+const jumpButton = document.getElementById('jump-button');
+jumpButton.addEventListener('touchstart', (e) => {
+    e.preventDefault();
     jump();
 });
+
+// Prevent default touch behaviors
+document.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    jump();
+}, { passive: false });
 
 // Initialize Telegram Web App
 let tg = window.Telegram.WebApp;
 if (tg) {
     tg.expand();
     tg.ready();
+    
+    // Set initial theme based on Telegram theme
+    if (tg.colorScheme === 'dark') {
+        gameState.theme = 'dark';
+        document.body.setAttribute('data-theme', 'dark');
+    }
 } 

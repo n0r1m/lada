@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LADA Jump Game</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
@@ -18,6 +18,13 @@
             --text-color: #f8f9fa;
         }
 
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -25,6 +32,11 @@
             background-color: var(--background-color);
             color: var(--text-color);
             transition: background-color 0.3s, color 0.3s;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
         }
 
         #game-container {
@@ -32,6 +44,7 @@
             width: 100vw;
             height: 100vh;
             overflow: hidden;
+            touch-action: none;
         }
 
         #game-canvas {
@@ -41,6 +54,7 @@
             width: 100%;
             height: 100%;
             background-color: var(--background-color);
+            touch-action: none;
         }
 
         #menu {
@@ -50,17 +64,31 @@
             transform: translate(-50%, -50%);
             text-align: center;
             z-index: 10;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            width: 80%;
+            max-width: 400px;
         }
 
         .button {
             background-color: var(--primary-color);
             color: white;
             border: none;
-            padding: 10px 20px;
-            margin: 5px;
-            border-radius: 5px;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 25px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 18px;
+            width: 80%;
+            max-width: 300px;
+            touch-action: manipulation;
+            transition: transform 0.1s;
+        }
+
+        .button:active {
+            transform: scale(0.95);
         }
 
         #settings {
@@ -76,6 +104,10 @@
             left: 20px;
             font-size: 24px;
             z-index: 10;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 15px;
+            border-radius: 20px;
+            color: white;
         }
 
         #coins {
@@ -84,6 +116,56 @@
             left: 20px;
             font-size: 24px;
             z-index: 10;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 15px;
+            border-radius: 20px;
+            color: white;
+        }
+
+        #jump-button {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 80px;
+            height: 80px;
+            background-color: rgba(255, 107, 107, 0.8);
+            border-radius: 50%;
+            z-index: 10;
+            touch-action: manipulation;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            #jump-button {
+                display: block;
+            }
+
+            .button {
+                padding: 12px 24px;
+                font-size: 16px;
+            }
+
+            #score, #coins {
+                font-size: 20px;
+                padding: 4px 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #menu {
+                width: 90%;
+                padding: 15px;
+            }
+
+            .button {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+
+            #score, #coins {
+                font-size: 18px;
+                padding: 3px 10px;
+            }
         }
     </style>
 </head>
@@ -100,6 +182,7 @@
             <button class="button" onclick="startGame()">Start Game</button>
             <button class="button" onclick="showReferral()">Referral</button>
         </div>
+        <div id="jump-button"></div>
     </div>
     <script src="./game.js"></script>
 </body>
