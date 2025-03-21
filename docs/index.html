@@ -4,19 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="format-detection" content="telephone=no">
-    <title>LADA Jump Game</title>
+    <title>Lada Combat</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
             --primary-color: #ff6b6b;
+            --secondary-color: #4ecdc4;
             --background-color: #f8f9fa;
             --text-color: #212529;
+            --accent-color: #ffd93d;
         }
 
         [data-theme="dark"] {
             --primary-color: #ff6b6b;
+            --secondary-color: #4ecdc4;
             --background-color: #212529;
             --text-color: #f8f9fa;
+            --accent-color: #ffd93d;
         }
 
         * {
@@ -101,66 +105,115 @@
             transform: scale(0.95);
         }
 
-        #settings {
+        .button.secondary {
+            background-color: var(--secondary-color);
+        }
+
+        .button.accent {
+            background-color: var(--accent-color);
+            color: #000;
+        }
+
+        #stats {
             position: absolute;
             top: 20px;
+            left: 20px;
+            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+            color: white;
+            backdrop-filter: blur(5px);
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+
+        .stat-label {
+            margin-right: 10px;
+        }
+
+        .stat-value {
+            color: var(--accent-color);
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            gap: 10px;
+            touch-action: manipulation;
+        }
+
+        .control-button {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: none;
+            font-size: 24px;
+            color: #333;
+            backdrop-filter: blur(5px);
+        }
+
+        .control-button:active {
+            background-color: rgba(255, 255, 255, 0.6);
+        }
+
+        #special-button {
+            position: absolute;
+            bottom: 20px;
             right: 20px;
-            z-index: 10;
-        }
-
-        #score {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            font-size: 24px;
-            z-index: 10;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 5px 15px;
-            border-radius: 20px;
-            color: white;
-            backdrop-filter: blur(5px);
-        }
-
-        #coins {
-            position: absolute;
-            top: 60px;
-            left: 20px;
-            font-size: 24px;
-            z-index: 10;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 5px 15px;
-            border-radius: 20px;
-            color: white;
-            backdrop-filter: blur(5px);
-        }
-
-        #jump-button {
-            position: absolute;
-            bottom: 30px;
-            right: 30px;
             width: 80px;
             height: 80px;
-            background-color: rgba(255, 107, 107, 0.8);
             border-radius: 50%;
+            background-color: var(--accent-color);
+            border: none;
+            font-size: 24px;
+            color: #000;
             z-index: 10;
-            touch-action: manipulation;
-            display: none;
             backdrop-filter: blur(5px);
+        }
+
+        #special-button:active {
+            transform: scale(0.95);
+        }
+
+        .car-stats {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        .car-stats p {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
         }
 
         @media (max-width: 768px) {
-            #jump-button {
-                display: block;
-            }
-
             .button {
                 padding: 12px 24px;
                 font-size: 16px;
             }
 
-            #score, #coins {
+            .control-button {
+                width: 50px;
+                height: 50px;
                 font-size: 20px;
-                padding: 4px 12px;
+            }
+
+            #special-button {
+                width: 70px;
+                height: 70px;
+                font-size: 20px;
             }
         }
 
@@ -175,9 +228,16 @@
                 font-size: 14px;
             }
 
-            #score, #coins {
+            .control-button {
+                width: 45px;
+                height: 45px;
                 font-size: 18px;
-                padding: 3px 10px;
+            }
+
+            #special-button {
+                width: 60px;
+                height: 60px;
+                font-size: 18px;
             }
         }
     </style>
@@ -185,17 +245,40 @@
 <body>
     <div id="game-container">
         <canvas id="game-canvas"></canvas>
-        <div id="score">Score: 0</div>
-        <div id="coins">Coins: 0</div>
-        <div id="settings">
-            <button class="button" onclick="toggleTheme()">Theme</button>
+        <div id="stats">
+            <div class="stat-item">
+                <span class="stat-label">Fuel:</span>
+                <span class="stat-value" id="fuel">100%</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Coins:</span>
+                <span class="stat-value" id="coins">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Parts:</span>
+                <span class="stat-value" id="parts">0</span>
+            </div>
         </div>
         <div id="menu">
-            <h1>LADA Jump Game</h1>
-            <button class="button" onclick="startGame()">Start Game</button>
-            <button class="button" onclick="showReferral()">Referral</button>
+            <h1>Lada Combat</h1>
+            <div class="car-stats">
+                <p>Speed: <span id="speed">5</span></p>
+                <p>Handling: <span id="handling">5</span></p>
+                <p>Durability: <span id="durability">5</span></p>
+                <p>Special: <span id="special">0</span></p>
+            </div>
+            <button class="button" onclick="startGame('race')">Start Race</button>
+            <button class="button secondary" onclick="startGame('battle')">Start Battle</button>
+            <button class="button accent" onclick="startGame('minigame')">Play Minigame</button>
+            <button class="button" onclick="showUpgrades()">Upgrade Car</button>
         </div>
-        <div id="jump-button"></div>
+        <div id="controls">
+            <button class="control-button" id="left-btn">←</button>
+            <button class="control-button" id="right-btn">→</button>
+            <button class="control-button" id="up-btn">↑</button>
+            <button class="control-button" id="down-btn">↓</button>
+        </div>
+        <button id="special-button">⚡</button>
     </div>
     <script src="./game.js"></script>
 </body>

@@ -2,26 +2,26 @@
 let gameState = {
     isPlaying: false,
     score: 0,
-    coinCount: 0,
-    highScore: 0,
-    isJumping: false,
-    jumpVelocity: 0,
-    gravity: 0.6,
-    jumpForce: -12,
-    groundY: 0,
-    carX: 100,
-    carY: 0,
-    obstacles: [],
-    coins: [],
-    gameSpeed: 3,
-    theme: 'light',
-    lastObstacleTime: 0,
-    obstacleInterval: 3000,
-    collectedCoins: new Set(),
-    lastCoinTime: 0,
-    coinInterval: 1500,
-    imagesLoaded: 0,
-    totalImages: 3,
+    fuel: 100,
+    maxFuel: 100,
+    car: {
+        model: 'lada-classic',
+        stats: {
+            speed: 5,
+            handling: 5,
+            durability: 5,
+            special: 0
+        },
+        upgrades: [],
+        position: { x: 100, y: 0 },
+        velocity: { x: 0, y: 0 }
+    },
+    currentMode: 'garage', // garage, race, battle, minigame
+    lastFuelUpdate: Date.now(),
+    fuelRegenRate: 1, // fuel points per minute
+    coins: 0,
+    parts: 0,
+    achievements: new Set(),
     isReady: false
 };
 
@@ -29,75 +29,102 @@ let gameState = {
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 
-// Load images with absolute paths
-const carImage = new Image();
-carImage.src = 'https://raw.githubusercontent.com/your-username/lada-jump-game/main/assets/lada.png';
+// Load game assets
+const assets = {
+    cars: {
+        'lada-classic': new Image(),
+        'lada-niva': new Image(),
+        'lada-kalina': new Image(),
+        'lada-priora': new Image(),
+        'lada-electron': new Image() // Easter egg car
+    },
+    tracks: {
+        'city': new Image(),
+        'rally': new Image(),
+        'circuit': new Image()
+    },
+    ui: {
+        'fuel-gauge': new Image(),
+        'speedometer': new Image(),
+        'coin': new Image(),
+        'part': new Image()
+    }
+};
 
-const coneImage = new Image();
-coneImage.src = 'https://raw.githubusercontent.com/your-username/lada-jump-game/main/assets/cone.png';
-
-const coinImage = new Image();
-coinImage.src = 'https://raw.githubusercontent.com/your-username/lada-jump-game/main/assets/coin.png';
-
-// Image loading handler
-function handleImageLoad() {
+// Asset loading handler
+function handleAssetLoad() {
     gameState.imagesLoaded++;
-    if (gameState.imagesLoaded === gameState.totalImages) {
+    if (gameState.imagesLoaded === Object.keys(assets).length) {
         gameState.isReady = true;
         document.getElementById('menu').style.display = 'block';
     }
 }
 
-carImage.onload = handleImageLoad;
-coneImage.onload = handleImageLoad;
-coinImage.onload = handleImageLoad;
-
-// Fallback images if loading fails
-carImage.onerror = () => {
-    console.error('Failed to load car image');
-    carImage.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI1MCIgdmlld0JveD0iMCAwIDgwIDUwIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iNTAiIGZpbGw9IiM2NjY2NjYiLz48cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIzMCIgZmlsbD0iIzQ0NDQ0NCIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iNDUiIHI9IjUiIGZpbGw9IiMyMjIyMjIiLz48Y2lyY2xlIGN4PSI2MCIgY3k9IjQ1IiByPSI1IiBmaWxsPSIjMjIyMjIyIi8+PC9zdmc+';
-};
-
-coneImage.onerror = () => {
-    console.error('Failed to load cone image');
-    coneImage.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cGF0aCBkPSJNMjAgMEwwIDQwaDQweiIgZmlsbD0iI2ZmNjYwMCIvPjxwYXRoIGQ9Ik0yMCA1TDUgMzVoMzB6IiBmaWxsPSIjZmY4ODAwIi8+PC9zdmc+';
-};
-
-coinImage.onerror = () => {
-    console.error('Failed to load coin image');
-    coinImage.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgdmlld0JveD0iMCAwIDMwIDMwIj48Y2lyY2xlIGN4PSIxNSIgY3k9IjE1IiByPSIxNSIgZmlsbD0iI2ZmZGMwMCIvPjxjaXJjbGUgY3g9IjE1IiBjeT0iMTUiIHI9IjEyIiBmaWxsPSIjZmZmZjAwIi8+PC9zdmc+';
-};
+// Load all assets
+Object.values(assets).forEach(category => {
+    Object.values(category).forEach(asset => {
+        asset.onload = handleAssetLoad;
+    });
+});
 
 // Resize canvas
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    gameState.groundY = canvas.height - 100;
-    gameState.carY = gameState.groundY;
 }
 
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
 // Game functions
-function startGame() {
+function startGame(mode) {
     if (!gameState.isReady) {
-        alert('Please wait for all images to load');
+        alert('Please wait for all assets to load');
         return;
     }
     
+    gameState.currentMode = mode;
     gameState.isPlaying = true;
-    gameState.score = 0;
-    gameState.coinCount = 0;
-    gameState.obstacles = [];
-    gameState.coins = [];
-    gameState.gameSpeed = 3;
-    gameState.lastObstacleTime = 0;
-    gameState.lastCoinTime = 0;
-    gameState.collectedCoins.clear();
+    
+    switch(mode) {
+        case 'race':
+            startRace();
+            break;
+        case 'battle':
+            startBattle();
+            break;
+        case 'minigame':
+            startMinigame();
+            break;
+    }
+    
     document.getElementById('menu').style.display = 'none';
-    document.getElementById('coins').textContent = `Coins: ${gameState.coinCount}`;
     gameLoop();
+}
+
+function startRace() {
+    gameState.score = 0;
+    gameState.car.position = { x: 100, y: canvas.height - 100 };
+    gameState.car.velocity = { x: 0, y: 0 };
+    generateTrack();
+}
+
+function startBattle() {
+    if (gameState.fuel < 20) {
+        alert('Not enough fuel for battle!');
+        return;
+    }
+    gameState.fuel -= 20;
+    generateOpponent();
+}
+
+function startMinigame() {
+    // Initialize minigame state
+    gameState.minigameState = {
+        type: 'repair',
+        progress: 0,
+        target: 100
+    };
 }
 
 function gameLoop() {
@@ -106,195 +133,169 @@ function gameLoop() {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw ground
-    ctx.fillStyle = '#333';
-    ctx.fillRect(0, gameState.groundY, canvas.width, canvas.height - gameState.groundY);
+    // Update game state
+    updateGameState();
 
-    // Update car position
-    if (gameState.isJumping) {
-        gameState.carY += gameState.jumpVelocity;
-        gameState.jumpVelocity += gameState.gravity;
+    // Draw game elements
+    drawGame();
 
-        if (gameState.carY >= gameState.groundY) {
-            gameState.carY = gameState.groundY;
-            gameState.isJumping = false;
-        }
-    }
-
-    // Draw car
-    ctx.drawImage(carImage, gameState.carX, gameState.carY - 50, 80, 50);
-
-    // Generate obstacles with timing
-    const currentTime = Date.now();
-    if (currentTime - gameState.lastObstacleTime > gameState.obstacleInterval) {
-        gameState.obstacles.push({
-            x: canvas.width,
-            y: gameState.groundY - 40,
-            width: 40,
-            height: 40
-        });
-        gameState.lastObstacleTime = currentTime;
-    }
-
-    // Generate coins with timing instead of random chance
-    if (currentTime - gameState.lastCoinTime > gameState.coinInterval) {
-        gameState.coins.push({
-            x: canvas.width,
-            y: gameState.groundY - 100,
-            width: 30,
-            height: 30
-        });
-        gameState.lastCoinTime = currentTime;
-    }
-
-    // Update and draw obstacles
-    gameState.obstacles = gameState.obstacles.filter(obstacle => {
-        obstacle.x -= gameState.gameSpeed;
-        ctx.drawImage(coneImage, obstacle.x, obstacle.y, obstacle.width, obstacle.height);
-        return obstacle.x > -obstacle.width;
-    });
-
-    // Update and draw coins
-    gameState.coins = gameState.coins.filter(coin => {
-        coin.x -= gameState.gameSpeed;
-        ctx.drawImage(coinImage, coin.x, coin.y, coin.width, coin.height);
-        return coin.x > -coin.width;
-    });
-
-    // Check collisions
-    checkCollisions();
-
-    // Update score
-    gameState.score++;
-    document.getElementById('score').textContent = `Score: ${Math.floor(gameState.score / 10)}`;
-
-    // Increase game speed more gradually
-    if (gameState.score % 2000 === 0) {
-        gameState.gameSpeed += 0.2;
-    }
+    // Check for game over conditions
+    checkGameOver();
 
     requestAnimationFrame(gameLoop);
 }
 
-function jump() {
-    if (!gameState.isJumping) {
-        gameState.isJumping = true;
-        gameState.jumpVelocity = gameState.jumpForce;
+function updateGameState() {
+    // Update fuel
+    const now = Date.now();
+    const timeDiff = (now - gameState.lastFuelUpdate) / 60000; // Convert to minutes
+    gameState.fuel = Math.min(
+        gameState.maxFuel,
+        gameState.fuel + (gameState.fuelRegenRate * timeDiff)
+    );
+    gameState.lastFuelUpdate = now;
+
+    // Update car position based on current mode
+    switch(gameState.currentMode) {
+        case 'race':
+            updateRacePhysics();
+            break;
+        case 'battle':
+            updateBattleState();
+            break;
+        case 'minigame':
+            updateMinigameState();
+            break;
     }
 }
 
-function checkCollisions() {
-    // Check obstacle collisions with more precise hitbox
-    for (let obstacle of gameState.obstacles) {
-        // Create a smaller hitbox for the car
-        const carHitbox = {
-            x: gameState.carX + 10,
-            y: gameState.carY - 40,
-            width: 60,
-            height: 40
-        };
+function drawGame() {
+    // Draw background
+    ctx.fillStyle = '#333';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Create a smaller hitbox for the obstacle
-        const obstacleHitbox = {
-            x: obstacle.x + 10,
-            y: obstacle.y + 10,
-            width: obstacle.width - 20,
-            height: obstacle.height - 20
-        };
-
-        if (carHitbox.x < obstacleHitbox.x + obstacleHitbox.width &&
-            carHitbox.x + carHitbox.width > obstacleHitbox.x &&
-            carHitbox.y < obstacleHitbox.y + obstacleHitbox.height &&
-            carHitbox.y + carHitbox.height > obstacleHitbox.y) {
-            gameOver();
-        }
+    // Draw track/arena based on mode
+    switch(gameState.currentMode) {
+        case 'race':
+            drawTrack();
+            break;
+        case 'battle':
+            drawArena();
+            break;
+        case 'minigame':
+            drawMinigame();
+            break;
     }
 
-    // Check coin collisions with more precise hitbox
-    for (let coin of gameState.coins) {
-        // Create a smaller hitbox for the car
-        const carHitbox = {
-            x: gameState.carX + 10,
-            y: gameState.carY - 40,
-            width: 60,
-            height: 40
-        };
+    // Draw car
+    drawCar();
 
-        // Create a smaller hitbox for the coin
-        const coinHitbox = {
-            x: coin.x + 5,
-            y: coin.y + 5,
-            width: coin.width - 10,
-            height: coin.height - 10
-        };
+    // Draw UI elements
+    drawUI();
+}
 
-        // Check if coin hasn't been collected yet
-        if (!gameState.collectedCoins.has(coin) &&
-            carHitbox.x < coinHitbox.x + coinHitbox.width &&
-            carHitbox.x + carHitbox.width > coinHitbox.x &&
-            carHitbox.y < coinHitbox.y + coinHitbox.height &&
-            carHitbox.y + carHitbox.height > coinHitbox.y) {
-            
-            gameState.coinCount++;
-            gameState.collectedCoins.add(coin);
-            document.getElementById('coins').textContent = `Coins: ${gameState.coinCount}`;
-            // Remove the collected coin from the coins array
-            gameState.coins = gameState.coins.filter(c => c !== coin);
-        }
+function drawUI() {
+    // Draw fuel gauge
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(10, 10, 200, 20);
+    ctx.fillStyle = '#ff0';
+    ctx.fillRect(10, 10, (gameState.fuel / gameState.maxFuel) * 200, 20);
+
+    // Draw score/coins
+    ctx.fillStyle = '#fff';
+    ctx.font = '20px Arial';
+    ctx.fillText(`Score: ${gameState.score}`, 10, 40);
+    ctx.fillText(`Coins: ${gameState.coins}`, 10, 60);
+    ctx.fillText(`Parts: ${gameState.parts}`, 10, 80);
+}
+
+function checkGameOver() {
+    switch(gameState.currentMode) {
+        case 'race':
+            if (gameState.car.position.x < 0) {
+                gameOver('Race Over!');
+            }
+            break;
+        case 'battle':
+            if (gameState.car.stats.durability <= 0) {
+                gameOver('Battle Lost!');
+            }
+            break;
+        case 'minigame':
+            if (gameState.minigameState.progress >= gameState.minigameState.target) {
+                gameOver('Minigame Complete!');
+            }
+            break;
     }
 }
 
-function gameOver() {
+function gameOver(message) {
     gameState.isPlaying = false;
-    if (gameState.score > gameState.highScore) {
-        gameState.highScore = gameState.score;
-    }
     document.getElementById('menu').style.display = 'block';
     document.getElementById('menu').innerHTML = `
-        <h1>Game Over!</h1>
-        <p>Score: ${Math.floor(gameState.score / 10)}</p>
-        <p>High Score: ${Math.floor(gameState.highScore / 10)}</p>
-        <button class="button" onclick="startGame()">Play Again</button>
-        <button class="button" onclick="showReferral()">Referral</button>
+        <h1>${message}</h1>
+        <p>Score: ${gameState.score}</p>
+        <p>Coins Earned: ${gameState.coins}</p>
+        <button class="button" onclick="startGame('${gameState.currentMode}')">Play Again</button>
+        <button class="button" onclick="showGarage()">Go to Garage</button>
     `;
 }
 
-function toggleTheme() {
-    gameState.theme = gameState.theme === 'light' ? 'dark' : 'light';
-    document.body.setAttribute('data-theme', gameState.theme);
-}
-
-function showReferral() {
-    const tg = window.Telegram.WebApp;
-    if (tg) {
-        const referralLink = `https://t.me/share/url?url=https://t.me/${tg.initDataUnsafe.user.username}`;
-        window.open(referralLink, '_blank');
-    }
+function showGarage() {
+    gameState.currentMode = 'garage';
+    document.getElementById('menu').style.display = 'block';
+    document.getElementById('menu').innerHTML = `
+        <h1>Lada Garage</h1>
+        <div class="car-stats">
+            <p>Speed: ${gameState.car.stats.speed}</p>
+            <p>Handling: ${gameState.car.stats.handling}</p>
+            <p>Durability: ${gameState.car.stats.durability}</p>
+            <p>Special: ${gameState.car.stats.special}</p>
+        </div>
+        <button class="button" onclick="startGame('race')">Start Race</button>
+        <button class="button" onclick="startGame('battle')">Start Battle</button>
+        <button class="button" onclick="startGame('minigame')">Play Minigame</button>
+        <button class="button" onclick="showUpgrades()">Upgrade Car</button>
+    `;
 }
 
 // Event listeners
 document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space') {
-        jump();
+    if (!gameState.isPlaying) return;
+    
+    switch(e.code) {
+        case 'ArrowLeft':
+            gameState.car.velocity.x = -gameState.car.stats.speed;
+            break;
+        case 'ArrowRight':
+            gameState.car.velocity.x = gameState.car.stats.speed;
+            break;
+        case 'ArrowUp':
+            gameState.car.velocity.y = -gameState.car.stats.speed;
+            break;
+        case 'ArrowDown':
+            gameState.car.velocity.y = gameState.car.stats.speed;
+            break;
+        case 'Space':
+            if (gameState.car.stats.special > 0) {
+                activateSpecial();
+            }
+            break;
     }
 });
 
-// Improved touch controls
-const jumpButton = document.getElementById('jump-button');
-jumpButton.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    jump();
+document.addEventListener('keyup', (e) => {
+    switch(e.code) {
+        case 'ArrowLeft':
+        case 'ArrowRight':
+            gameState.car.velocity.x = 0;
+            break;
+        case 'ArrowUp':
+        case 'ArrowDown':
+            gameState.car.velocity.y = 0;
+            break;
+    }
 });
-
-// Prevent default touch behaviors
-document.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-}, { passive: false });
-
-document.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    jump();
-}, { passive: false });
 
 // Initialize Telegram Web App
 let tg = window.Telegram.WebApp;
