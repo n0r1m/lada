@@ -21,28 +21,29 @@ let gameState = {
     lastCoinTime: 0,
     coinInterval: 1500,
     imagesLoaded: 0,
-    totalImages: 3
+    totalImages: 3,
+    isReady: false
 };
 
 // Canvas setup
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 
-// Load images
+// Load images with absolute paths
 const carImage = new Image();
-carImage.src = './assets/lada.png';
+carImage.src = 'https://raw.githubusercontent.com/your-username/lada-jump-game/main/assets/lada.png';
 
 const coneImage = new Image();
-coneImage.src = './assets/cone.png';
+coneImage.src = 'https://raw.githubusercontent.com/your-username/lada-jump-game/main/assets/cone.png';
 
 const coinImage = new Image();
-coinImage.src = './assets/coin.png';
+coinImage.src = 'https://raw.githubusercontent.com/your-username/lada-jump-game/main/assets/coin.png';
 
 // Image loading handler
 function handleImageLoad() {
     gameState.imagesLoaded++;
     if (gameState.imagesLoaded === gameState.totalImages) {
-        // All images loaded, enable start button
+        gameState.isReady = true;
         document.getElementById('menu').style.display = 'block';
     }
 }
@@ -80,7 +81,7 @@ resizeCanvas();
 
 // Game functions
 function startGame() {
-    if (gameState.imagesLoaded < gameState.totalImages) {
+    if (!gameState.isReady) {
         alert('Please wait for all images to load');
         return;
     }
@@ -187,18 +188,18 @@ function checkCollisions() {
     for (let obstacle of gameState.obstacles) {
         // Create a smaller hitbox for the car
         const carHitbox = {
-            x: gameState.carX + 20,
-            y: gameState.carY - 30,
-            width: 40,
-            height: 30
+            x: gameState.carX + 10,
+            y: gameState.carY - 40,
+            width: 60,
+            height: 40
         };
 
         // Create a smaller hitbox for the obstacle
         const obstacleHitbox = {
-            x: obstacle.x + 5,
-            y: obstacle.y + 5,
-            width: obstacle.width - 10,
-            height: obstacle.height - 10
+            x: obstacle.x + 10,
+            y: obstacle.y + 10,
+            width: obstacle.width - 20,
+            height: obstacle.height - 20
         };
 
         if (carHitbox.x < obstacleHitbox.x + obstacleHitbox.width &&
@@ -213,10 +214,10 @@ function checkCollisions() {
     for (let coin of gameState.coins) {
         // Create a smaller hitbox for the car
         const carHitbox = {
-            x: gameState.carX + 20,
-            y: gameState.carY - 30,
-            width: 40,
-            height: 30
+            x: gameState.carX + 10,
+            y: gameState.carY - 40,
+            width: 60,
+            height: 40
         };
 
         // Create a smaller hitbox for the coin
