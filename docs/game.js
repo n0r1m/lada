@@ -579,30 +579,90 @@ const upBtn = document.getElementById('up-btn');
 const downBtn = document.getElementById('down-btn');
 const specialBtn = document.getElementById('special-button');
 
-leftBtn.addEventListener('touchstart', () => {
-    gameState.car.velocity.x = -gameState.car.stats.speed;
+// Prevent default touch behaviors
+document.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+}, { passive: false });
+
+// Touch control handlers
+function handleTouchStart(btn, velocity) {
+    if (!gameState.isPlaying) return;
+    e.preventDefault();
+    if (btn === leftBtn || btn === rightBtn) {
+        gameState.car.velocity.x = velocity;
+    } else if (btn === upBtn || btn === downBtn) {
+        gameState.car.velocity.y = velocity;
+    }
+}
+
+function handleTouchEnd(btn) {
+    e.preventDefault();
+    if (btn === leftBtn || btn === rightBtn) {
+        gameState.car.velocity.x = 0;
+    } else if (btn === upBtn || btn === downBtn) {
+        gameState.car.velocity.y = 0;
+    }
+}
+
+// Add touch event listeners
+leftBtn.addEventListener('touchstart', (e) => handleTouchStart(leftBtn, -gameState.car.stats.speed));
+rightBtn.addEventListener('touchstart', (e) => handleTouchStart(rightBtn, gameState.car.stats.speed));
+upBtn.addEventListener('touchstart', (e) => handleTouchStart(upBtn, -gameState.car.stats.speed));
+downBtn.addEventListener('touchstart', (e) => handleTouchStart(downBtn, gameState.car.stats.speed));
+
+[leftBtn, rightBtn, upBtn, downBtn].forEach(btn => {
+    btn.addEventListener('touchend', (e) => handleTouchEnd(btn));
+    btn.addEventListener('touchcancel', (e) => handleTouchEnd(btn));
 });
 
-rightBtn.addEventListener('touchstart', () => {
-    gameState.car.velocity.x = gameState.car.stats.speed;
-});
-
-upBtn.addEventListener('touchstart', () => {
-    gameState.car.velocity.y = -gameState.car.stats.speed;
-});
-
-downBtn.addEventListener('touchstart', () => {
-    gameState.car.velocity.y = gameState.car.stats.speed;
-});
-
-specialBtn.addEventListener('touchstart', () => {
-    if (gameState.car.stats.special > 0) {
+specialBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (gameState.isPlaying && gameState.car.stats.special > 0) {
         activateSpecial();
     }
 });
 
+// Add click event listeners for desktop
+leftBtn.addEventListener('mousedown', () => {
+    if (!gameState.isPlaying) return;
+    gameState.car.velocity.x = -gameState.car.stats.speed;
+});
+
+rightBtn.addEventListener('mousedown', () => {
+    if (!gameState.isPlaying) return;
+    gameState.car.velocity.x = gameState.car.stats.speed;
+});
+
+upBtn.addEventListener('mousedown', () => {
+    if (!gameState.isPlaying) return;
+    gameState.car.velocity.y = -gameState.car.stats.speed;
+});
+
+downBtn.addEventListener('mousedown', () => {
+    if (!gameState.isPlaying) return;
+    gameState.car.velocity.y = gameState.car.stats.speed;
+});
+
+specialBtn.addEventListener('click', () => {
+    if (gameState.isPlaying && gameState.car.stats.special > 0) {
+        activateSpecial();
+    }
+});
+
+// Mouse up event listeners
 [leftBtn, rightBtn, upBtn, downBtn].forEach(btn => {
-    btn.addEventListener('touchend', () => {
+    btn.addEventListener('mouseup', () => {
+        if (btn === leftBtn || btn === rightBtn) {
+            gameState.car.velocity.x = 0;
+        } else {
+            gameState.car.velocity.y = 0;
+        }
+    });
+    btn.addEventListener('mouseleave', () => {
         if (btn === leftBtn || btn === rightBtn) {
             gameState.car.velocity.x = 0;
         } else {
