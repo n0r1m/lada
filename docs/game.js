@@ -6,18 +6,20 @@ let gameState = {
     highScore: 0,
     isJumping: false,
     jumpVelocity: 0,
-    gravity: 0.8,
-    jumpForce: -15,
+    gravity: 0.6,
+    jumpForce: -12,
     groundY: 0,
     carX: 100,
     carY: 0,
     obstacles: [],
     coins: [],
-    gameSpeed: 5,
+    gameSpeed: 3,
     theme: 'light',
     lastObstacleTime: 0,
-    obstacleInterval: 2000,
-    collectedCoins: new Set() // Track collected coins to prevent double counting
+    obstacleInterval: 3000,
+    collectedCoins: new Set(),
+    lastCoinTime: 0,
+    coinInterval: 1500
 };
 
 // Canvas setup
@@ -52,9 +54,10 @@ function startGame() {
     gameState.coinCount = 0;
     gameState.obstacles = [];
     gameState.coins = [];
-    gameState.gameSpeed = 5;
+    gameState.gameSpeed = 3;
     gameState.lastObstacleTime = 0;
-    gameState.collectedCoins.clear(); // Clear collected coins set
+    gameState.lastCoinTime = 0;
+    gameState.collectedCoins.clear();
     document.getElementById('menu').style.display = 'none';
     document.getElementById('coins').textContent = `Coins: ${gameState.coinCount}`;
     gameLoop();
@@ -96,14 +99,15 @@ function gameLoop() {
         gameState.lastObstacleTime = currentTime;
     }
 
-    // Generate coins with reduced frequency
-    if (Math.random() < 0.005) {
+    // Generate coins with timing instead of random chance
+    if (currentTime - gameState.lastCoinTime > gameState.coinInterval) {
         gameState.coins.push({
             x: canvas.width,
             y: gameState.groundY - 100,
             width: 30,
             height: 30
         });
+        gameState.lastCoinTime = currentTime;
     }
 
     // Update and draw obstacles
@@ -128,8 +132,8 @@ function gameLoop() {
     document.getElementById('score').textContent = `Score: ${Math.floor(gameState.score / 10)}`;
 
     // Increase game speed more gradually
-    if (gameState.score % 1000 === 0) {
-        gameState.gameSpeed += 0.3;
+    if (gameState.score % 2000 === 0) {
+        gameState.gameSpeed += 0.2;
     }
 
     requestAnimationFrame(gameLoop);
