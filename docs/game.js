@@ -22,7 +22,16 @@ let gameState = {
     coins: 0,
     parts: 0,
     achievements: new Set(),
-    isReady: false
+    isReady: false,
+    imagesLoaded: 0,
+    totalImages: 0,
+    tracks: [],
+    opponents: [],
+    powerups: [],
+    currentTrack: null,
+    currentOpponent: null,
+    battleState: null,
+    minigameState: null
 };
 
 // Canvas setup
@@ -48,13 +57,23 @@ const assets = {
         'speedometer': new Image(),
         'coin': new Image(),
         'part': new Image()
+    },
+    powerups: {
+        'nitro': new Image(),
+        'repair': new Image(),
+        'shield': new Image()
     }
 };
+
+// Count total images for loading
+Object.values(assets).forEach(category => {
+    gameState.totalImages += Object.keys(category).length;
+});
 
 // Asset loading handler
 function handleAssetLoad() {
     gameState.imagesLoaded++;
-    if (gameState.imagesLoaded === Object.keys(assets).length) {
+    if (gameState.imagesLoaded === gameState.totalImages) {
         gameState.isReady = true;
         document.getElementById('menu').style.display = 'block';
     }
@@ -62,10 +81,27 @@ function handleAssetLoad() {
 
 // Load all assets
 Object.values(assets).forEach(category => {
-    Object.values(category).forEach(asset => {
+    Object.entries(category).forEach(([key, asset]) => {
         asset.onload = handleAssetLoad;
+        asset.onerror = () => {
+            console.error(`Failed to load asset: ${key}`);
+            // Use fallback SVG for failed images
+            asset.src = `data:image/svg+xml;base64,${getFallbackSVG(key)}`;
+        };
+        asset.src = `./assets/${key}.png`;
     });
 });
+
+// Fallback SVG generator
+function getFallbackSVG(type) {
+    const svgs = {
+        'lada-classic': 'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI1MCIgdmlld0JveD0iMCAwIDgwIDUwIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iNTAiIGZpbGw9IiM2NjY2NjYiLz48cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIzMCIgZmlsbD0iIzQ0NDQ0NCIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iNDUiIHI9IjUiIGZpbGw9IiMyMjIyMjIiLz48Y2lyY2xlIGN4PSI2MCIgY3k9IjQ1IiByPSI1IiBmaWxsPSIjMjIyMjIyIi8+PC9zdmc+',
+        'lada-niva': 'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDgwIDYwIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iNjAiIGZpbGw9IiM2NjY2NjYiLz48cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0MCIgZmlsbD0iIzQ0NDQ0NCIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iNTUiIHI9IjUiIGZpbGw9IiMyMjIyMjIiLz48Y2lyY2xlIGN4PSI2MCIgY3k9IjU1IiByPSI1IiBmaWxsPSIjMjIyMjIyIi8+PC9zdmc+',
+        'coin': 'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgdmlld0JveD0iMCAwIDMwIDMwIj48Y2lyY2xlIGN4PSIxNSIgY3k9IjE1IiByPSIxNSIgZmlsbD0iI2ZmZGMwMCIvPjxjaXJjbGUgY3g9IjE1IiBjeT0iMTUiIHI9IjEyIiBmaWxsPSIjZmZmZjAwIi8+PC9zdmc+',
+        'part': 'PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgdmlld0JveD0iMCAwIDMwIDMwIj48cmVjdCB3aWR0aD0iMzAiIGhlaWdodD0iMzAiIGZpbGw9IiM4ODg4ODgiLz48cmVjdCB4PSI1IiB5PSI1IiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiM2NjY2NjYiLz48L3N2Zz4='
+    };
+    return svgs[type] || svgs['lada-classic'];
+}
 
 // Resize canvas
 function resizeCanvas() {
@@ -107,6 +143,7 @@ function startRace() {
     gameState.car.position = { x: 100, y: canvas.height - 100 };
     gameState.car.velocity = { x: 0, y: 0 };
     generateTrack();
+    updateUI();
 }
 
 function startBattle() {
@@ -116,15 +153,84 @@ function startBattle() {
     }
     gameState.fuel -= 20;
     generateOpponent();
+    updateUI();
 }
 
 function startMinigame() {
-    // Initialize minigame state
     gameState.minigameState = {
         type: 'repair',
         progress: 0,
-        target: 100
+        target: 100,
+        parts: []
     };
+    generateMinigameParts();
+    updateUI();
+}
+
+function generateTrack() {
+    gameState.tracks = [];
+    const trackTypes = ['city', 'rally', 'circuit'];
+    gameState.currentTrack = trackTypes[Math.floor(Math.random() * trackTypes.length)];
+    
+    // Generate track segments
+    for (let i = 0; i < 5; i++) {
+        gameState.tracks.push({
+            type: gameState.currentTrack,
+            x: canvas.width + (i * 800),
+            obstacles: generateObstacles(),
+            powerups: generatePowerups()
+        });
+    }
+}
+
+function generateObstacles() {
+    const obstacles = [];
+    const count = Math.floor(Math.random() * 3) + 1;
+    for (let i = 0; i < count; i++) {
+        obstacles.push({
+            x: Math.random() * 700,
+            y: canvas.height - 100,
+            type: Math.random() < 0.5 ? 'cone' : 'barrier'
+        });
+    }
+    return obstacles;
+}
+
+function generatePowerups() {
+    const powerups = [];
+    if (Math.random() < 0.3) {
+        powerups.push({
+            x: Math.random() * 700,
+            y: canvas.height - 150,
+            type: ['nitro', 'repair', 'shield'][Math.floor(Math.random() * 3)]
+        });
+    }
+    return powerups;
+}
+
+function generateOpponent() {
+    const models = Object.keys(assets.cars);
+    const model = models[Math.floor(Math.random() * models.length)];
+    gameState.currentOpponent = {
+        model,
+        position: { x: canvas.width - 100, y: canvas.height - 100 },
+        stats: {
+            speed: Math.random() * 3 + 4,
+            handling: Math.random() * 3 + 4,
+            durability: Math.random() * 3 + 4
+        }
+    };
+}
+
+function generateMinigameParts() {
+    gameState.minigameState.parts = [];
+    for (let i = 0; i < 5; i++) {
+        gameState.minigameState.parts.push({
+            x: Math.random() * (canvas.width - 100) + 50,
+            y: Math.random() * (canvas.height - 100) + 50,
+            type: ['engine', 'wheel', 'body', 'electronics'][Math.floor(Math.random() * 4)]
+        });
+    }
 }
 
 function gameLoop() {
@@ -167,6 +273,63 @@ function updateGameState() {
             updateMinigameState();
             break;
     }
+
+    // Update UI
+    updateUI();
+}
+
+function updateRacePhysics() {
+    // Apply velocity
+    gameState.car.position.x += gameState.car.velocity.x;
+    gameState.car.position.y += gameState.car.velocity.y;
+
+    // Keep car within bounds
+    gameState.car.position.x = Math.max(0, Math.min(canvas.width - 80, gameState.car.position.x));
+    gameState.car.position.y = Math.max(0, Math.min(canvas.height - 50, gameState.car.position.y));
+
+    // Update track segments
+    gameState.tracks = gameState.tracks.filter(track => {
+        track.x -= gameState.car.stats.speed;
+        return track.x > -800;
+    });
+
+    // Generate new track segments
+    if (gameState.tracks.length < 5) {
+        const lastTrack = gameState.tracks[gameState.tracks.length - 1];
+        gameState.tracks.push({
+            type: gameState.currentTrack,
+            x: lastTrack.x + 800,
+            obstacles: generateObstacles(),
+            powerups: generatePowerups()
+        });
+    }
+}
+
+function updateBattleState() {
+    if (!gameState.currentOpponent) return;
+
+    // Update opponent position
+    gameState.currentOpponent.position.x -= gameState.currentOpponent.stats.speed;
+    
+    // Check for battle end
+    if (gameState.currentOpponent.position.x < -100) {
+        gameOver('Battle Won!');
+    }
+}
+
+function updateMinigameState() {
+    if (!gameState.minigameState) return;
+
+    // Update minigame progress
+    gameState.minigameState.progress = Math.min(
+        gameState.minigameState.target,
+        gameState.minigameState.progress + 0.1
+    );
+
+    // Check for minigame completion
+    if (gameState.minigameState.progress >= gameState.minigameState.target) {
+        gameOver('Minigame Complete!');
+    }
 }
 
 function drawGame() {
@@ -194,6 +357,76 @@ function drawGame() {
     drawUI();
 }
 
+function drawTrack() {
+    // Draw track segments
+    gameState.tracks.forEach(track => {
+        ctx.drawImage(assets.tracks[track.type], track.x, 0, 800, canvas.height);
+        
+        // Draw obstacles
+        track.obstacles.forEach(obstacle => {
+            ctx.fillStyle = '#ff6600';
+            ctx.fillRect(
+                track.x + obstacle.x,
+                obstacle.y,
+                40,
+                40
+            );
+        });
+
+        // Draw powerups
+        track.powerups.forEach(powerup => {
+            ctx.drawImage(
+                assets.powerups[powerup.type],
+                track.x + powerup.x,
+                powerup.y,
+                30,
+                30
+            );
+        });
+    });
+}
+
+function drawArena() {
+    // Draw arena background
+    ctx.fillStyle = '#444';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw opponent
+    if (gameState.currentOpponent) {
+        ctx.drawImage(
+            assets.cars[gameState.currentOpponent.model],
+            gameState.currentOpponent.position.x,
+            gameState.currentOpponent.position.y,
+            80,
+            50
+        );
+    }
+}
+
+function drawMinigame() {
+    // Draw minigame background
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw parts
+    if (gameState.minigameState) {
+        gameState.minigameState.parts.forEach(part => {
+            ctx.fillStyle = '#666';
+            ctx.fillRect(part.x, part.y, 40, 40);
+        });
+    }
+}
+
+function drawCar() {
+    ctx.drawImage(
+        assets.cars[gameState.car.model],
+        gameState.car.position.x,
+        gameState.car.position.y,
+        80,
+        50
+    );
+}
+
 function drawUI() {
     // Draw fuel gauge
     ctx.fillStyle = '#fff';
@@ -207,6 +440,16 @@ function drawUI() {
     ctx.fillText(`Score: ${gameState.score}`, 10, 40);
     ctx.fillText(`Coins: ${gameState.coins}`, 10, 60);
     ctx.fillText(`Parts: ${gameState.parts}`, 10, 80);
+}
+
+function updateUI() {
+    document.getElementById('fuel').textContent = `${Math.round(gameState.fuel)}%`;
+    document.getElementById('coins').textContent = gameState.coins;
+    document.getElementById('parts').textContent = gameState.parts;
+    document.getElementById('speed').textContent = gameState.car.stats.speed;
+    document.getElementById('handling').textContent = gameState.car.stats.handling;
+    document.getElementById('durability').textContent = gameState.car.stats.durability;
+    document.getElementById('special').textContent = gameState.car.stats.special;
 }
 
 function checkGameOver() {
@@ -247,16 +490,48 @@ function showGarage() {
     document.getElementById('menu').innerHTML = `
         <h1>Lada Garage</h1>
         <div class="car-stats">
-            <p>Speed: ${gameState.car.stats.speed}</p>
-            <p>Handling: ${gameState.car.stats.handling}</p>
-            <p>Durability: ${gameState.car.stats.durability}</p>
-            <p>Special: ${gameState.car.stats.special}</p>
+            <p>Speed: <span id="speed">${gameState.car.stats.speed}</span></p>
+            <p>Handling: <span id="handling">${gameState.car.stats.handling}</span></p>
+            <p>Durability: <span id="durability">${gameState.car.stats.durability}</span></p>
+            <p>Special: <span id="special">${gameState.car.stats.special}</span></p>
         </div>
         <button class="button" onclick="startGame('race')">Start Race</button>
-        <button class="button" onclick="startGame('battle')">Start Battle</button>
-        <button class="button" onclick="startGame('minigame')">Play Minigame</button>
+        <button class="button secondary" onclick="startGame('battle')">Start Battle</button>
+        <button class="button accent" onclick="startGame('minigame')">Play Minigame</button>
         <button class="button" onclick="showUpgrades()">Upgrade Car</button>
     `;
+}
+
+function showUpgrades() {
+    document.getElementById('menu').innerHTML = `
+        <h1>Car Upgrades</h1>
+        <div class="car-stats">
+            <p>Speed: <span id="speed">${gameState.car.stats.speed}</span></p>
+            <p>Handling: <span id="handling">${gameState.car.stats.handling}</span></p>
+            <p>Durability: <span id="durability">${gameState.car.stats.durability}</span></p>
+            <p>Special: <span id="special">${gameState.car.stats.special}</span></p>
+        </div>
+        <button class="button" onclick="upgradeStat('speed')">Upgrade Speed (${gameState.coins >= 100 ? '100 coins' : 'Not enough coins'})</button>
+        <button class="button" onclick="upgradeStat('handling')">Upgrade Handling (${gameState.coins >= 100 ? '100 coins' : 'Not enough coins'})</button>
+        <button class="button" onclick="upgradeStat('durability')">Upgrade Durability (${gameState.coins >= 100 ? '100 coins' : 'Not enough coins'})</button>
+        <button class="button" onclick="upgradeStat('special')">Upgrade Special (${gameState.coins >= 200 ? '200 coins' : 'Not enough coins'})</button>
+        <button class="button" onclick="showGarage()">Back to Garage</button>
+    `;
+}
+
+function upgradeStat(stat) {
+    const costs = {
+        speed: 100,
+        handling: 100,
+        durability: 100,
+        special: 200
+    };
+
+    if (gameState.coins >= costs[stat]) {
+        gameState.coins -= costs[stat];
+        gameState.car.stats[stat]++;
+        showUpgrades();
+    }
 }
 
 // Event listeners
@@ -296,6 +571,65 @@ document.addEventListener('keyup', (e) => {
             break;
     }
 });
+
+// Touch controls
+const leftBtn = document.getElementById('left-btn');
+const rightBtn = document.getElementById('right-btn');
+const upBtn = document.getElementById('up-btn');
+const downBtn = document.getElementById('down-btn');
+const specialBtn = document.getElementById('special-button');
+
+leftBtn.addEventListener('touchstart', () => {
+    gameState.car.velocity.x = -gameState.car.stats.speed;
+});
+
+rightBtn.addEventListener('touchstart', () => {
+    gameState.car.velocity.x = gameState.car.stats.speed;
+});
+
+upBtn.addEventListener('touchstart', () => {
+    gameState.car.velocity.y = -gameState.car.stats.speed;
+});
+
+downBtn.addEventListener('touchstart', () => {
+    gameState.car.velocity.y = gameState.car.stats.speed;
+});
+
+specialBtn.addEventListener('touchstart', () => {
+    if (gameState.car.stats.special > 0) {
+        activateSpecial();
+    }
+});
+
+[leftBtn, rightBtn, upBtn, downBtn].forEach(btn => {
+    btn.addEventListener('touchend', () => {
+        if (btn === leftBtn || btn === rightBtn) {
+            gameState.car.velocity.x = 0;
+        } else {
+            gameState.car.velocity.y = 0;
+        }
+    });
+});
+
+function activateSpecial() {
+    gameState.car.stats.special--;
+    switch(gameState.currentMode) {
+        case 'race':
+            gameState.car.stats.speed *= 2;
+            setTimeout(() => {
+                gameState.car.stats.speed /= 2;
+            }, 5000);
+            break;
+        case 'battle':
+            if (gameState.currentOpponent) {
+                gameState.currentOpponent.stats.durability -= 2;
+            }
+            break;
+        case 'minigame':
+            gameState.minigameState.progress += 20;
+            break;
+    }
+}
 
 // Initialize Telegram Web App
 let tg = window.Telegram.WebApp;
