@@ -16,7 +16,8 @@ let gameState = {
     gameSpeed: 5,
     theme: 'light',
     lastObstacleTime: 0,
-    obstacleInterval: 2000
+    obstacleInterval: 2000,
+    collectedCoins: new Set() // Track collected coins to prevent double counting
 };
 
 // Canvas setup
@@ -53,6 +54,7 @@ function startGame() {
     gameState.coins = [];
     gameState.gameSpeed = 5;
     gameState.lastObstacleTime = 0;
+    gameState.collectedCoins.clear(); // Clear collected coins set
     document.getElementById('menu').style.display = 'none';
     document.getElementById('coins').textContent = `Coins: ${gameState.coinCount}`;
     gameLoop();
@@ -141,23 +143,59 @@ function jump() {
 }
 
 function checkCollisions() {
-    // Check obstacle collisions
+    // Check obstacle collisions with more precise hitbox
     for (let obstacle of gameState.obstacles) {
-        if (gameState.carX < obstacle.x + obstacle.width &&
-            gameState.carX + 80 > obstacle.x &&
-            gameState.carY < obstacle.y + obstacle.height &&
-            gameState.carY + 50 > obstacle.y) {
+        // Create a smaller hitbox for the car
+        const carHitbox = {
+            x: gameState.carX + 20, // Offset from left
+            y: gameState.carY - 30, // Offset from bottom
+            width: 40, // Smaller width
+            height: 30 // Smaller height
+        };
+
+        // Create a smaller hitbox for the obstacle
+        const obstacleHitbox = {
+            x: obstacle.x + 5,
+            y: obstacle.y + 5,
+            width: obstacle.width - 10,
+            height: obstacle.height - 10
+        };
+
+        if (carHitbox.x < obstacleHitbox.x + obstacleHitbox.width &&
+            carHitbox.x + carHitbox.width > obstacleHitbox.x &&
+            carHitbox.y < obstacleHitbox.y + obstacleHitbox.height &&
+            carHitbox.y + carHitbox.height > obstacleHitbox.y) {
             gameOver();
         }
     }
 
-    // Check coin collisions
+    // Check coin collisions with more precise hitbox
     for (let coin of gameState.coins) {
-        if (gameState.carX < coin.x + coin.width &&
-            gameState.carX + 80 > coin.x &&
-            gameState.carY < coin.y + coin.height &&
-            gameState.carY + 50 > coin.y) {
+        // Create a smaller hitbox for the car
+        const carHitbox = {
+            x: gameState.carX + 20,
+            y: gameState.carY - 30,
+            width: 40,
+            height: 30
+        };
+
+        // Create a smaller hitbox for the coin
+        const coinHitbox = {
+            x: coin.x + 5,
+            y: coin.y + 5,
+            width: coin.width - 10,
+            height: coin.height - 10
+        };
+
+        // Check if coin hasn't been collected yet
+        if (!gameState.collectedCoins.has(coin) &&
+            carHitbox.x < coinHitbox.x + coinHitbox.width &&
+            carHitbox.x + carHitbox.width > coinHitbox.x &&
+            carHitbox.y < coinHitbox.y + coinHitbox.height &&
+            carHitbox.y + carHitbox.height > coinHitbox.y) {
+            
             gameState.coinCount++;
+            gameState.collectedCoins.add(coin);
             document.getElementById('coins').textContent = `Coins: ${gameState.coinCount}`;
         }
     }
